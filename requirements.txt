@@ -1,2 +1,10 @@
+<<<<<<< HEAD
 Flask==2.3.2
 Werkzeug==3.0.6
+=======
+﻿Flask==2.0.1
+Werkzeug==2.0.3    # 与 Flask 2.0.1 兼容
+pytest==7.4.3
+coverage==7.3.2
+flake8==7.3.0
+>>>>>>> d09ee7e (Initial commit with CI/CD configuration)
