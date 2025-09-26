@@ -1,86 +1,98 @@
 ﻿pipeline {
-  agent any
+    agent any
 
-  environment {
-    # 改成你的 Python 可执行文件路径（例：C:\\Users\\86150\\AppData\\Local\\Programs\\Python\\Python311\\python.exe）
-    PYTHON_PATH = "C:\\Users\\86150\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"
-  }
-
-  stages {
-    stage("Checkout") {
-      steps {
-        // 如果你用 HTTPS + 用户名/Token，建议加 credentialsId
-        // 先在 Jenkins 全局凭据里新建一个 ID（例如 github-credentials）
-        git url: "https://github.com/你的GitHub用户名/你的仓库名.git",
-            branch: "main",
-            credentialsId: "github-credentials"
-      }
+    environment {
+        PYTHON_PATH = 'C:\\Users\\86150\\AppData\\Local\\Programs\\Python\\Python311\\python.exe'
     }
 
-    stage("Fix pip") {
-      steps {
-        bat """
-          @echo off
-          %PYTHON_PATH% -m ensurepip --upgrade
-          %PYTHON_PATH% -m pip --version
-        """
-      }
-    }
-
-    stage("Install Deps") {
-      steps {
-        bat """
-          %PYTHON_PATH% -m pip install --upgrade pip
-          %PYTHON_PATH% -m pip install -r requirements.txt
-        """
-      }
-    }
-
-    stage("Lint") {
-      steps {
-        bat "%PYTHON_PATH% -m flake8 app.py tests/"
-      }
-    }
-
-    stage("Test") {
-      steps {
-        bat """
-          %PYTHON_PATH% -m pytest --cov=app tests/ --cov-report=html
-        """
-      }
-      post {
-        always {
-          publishHTML(target: [
-            reportDir: 'htmlcov',
-            reportFiles: 'index.html',
-            reportName: 'Coverage Report',
-            keepAll: true,
-            alwaysLinkToLastBuild: false,
-            allowMissing: true
-          ])
+    stages {
+        stage('Verify Python Path') {
+            steps {
+                bat """
+                    @echo off
+                    echo "=== 验证Python路径及版本 ==="
+                    "${PYTHON_PATH}" --version
+                    echo "Python路径验证通过！"
+                """
+            }
         }
-      }
+
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/yu-2-tang/flask-web-app.git', branch: 'main'
+            }
+        }
+
+        stage('Fix pip') {
+            steps {
+                bat """
+                    @echo off
+                    echo "=== 修复pip环境 ==="
+                    "${PYTHON_PATH}" -m ensurepip --upgrade
+                    "${PYTHON_PATH}" -m pip --version
+                """
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                bat """
+                    @echo off
+                    "${PYTHON_PATH}" -m pip install --upgrade pip
+                    "${PYTHON_PATH}" -m pip install -r requirements.txt
+                """
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                bat """
+                    "${PYTHON_PATH}" -m pip install flake8
+                    "${PYTHON_PATH}" -m flake8 app.py tests/
+                """
+            }
+        }
+
+        stage('Test') {
+            steps {
+                bat """
+                    "${PYTHON_PATH}" -m pip install pytest coverage
+                    "${PYTHON_PATH}" -m pytest --cov=app tests/ --cov-report=html
+                """
+            }
+            post {
+                always {
+                    publishHTML(target: [
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: false,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report'
+                    ])
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                bat """
+                    "${PYTHON_PATH}" -m pip install pyinstaller
+                    "${PYTHON_PATH}" -m pyinstaller --onefile app.py
+                """
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying application...'
+                bat "start \"FlaskApp\" ${PYTHON_PATH} app.py"
+            }
+        }
     }
 
-    stage("Build (optional)") {
-      steps {
-        bat """
-          %PYTHON_PATH% -m pip install pyinstaller
-          %PYTHON_PATH% -m PyInstaller --onefile app.py
-        """
-      }
+    post {
+        success { echo '✅ CI/CD pipeline completed successfully!' }
+        failure { echo '❌ CI/CD pipeline failed!' }
     }
-
-    stage("Deploy (demo)") {
-      steps {
-        echo "Deploying application (demo)..."
-        // 真部署按你的需求实现（IIS/Docker/复制到服务器/SSH 等）
-      }
-    }
-  }
-
-  post {
-    success { echo "CI/CD pipeline completed successfully!" }
-    failure { echo "CI/CD pipeline failed!" }
-  }
 }
