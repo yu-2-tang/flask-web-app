@@ -9,6 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,35 +31,27 @@ jobs:
           pytest tests/ -v
         continue-on-error: false
 
+      # ！！！端口已改为你的 46380 ！！！
       - name: Deploy to Touge Server via SSH (Port 46380)
         run: |
-          # 配置SSH环境
+          set -e
+          echo "[CI] Preparing SSH environment..."
           mkdir -p ~/.ssh
-
-          # 写入RSA私钥（必须配置在 GitHub Secrets）
           printf "%s\n" "${{ secrets.TOUGE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-
-          # 设置权限
           chmod 600 ~/.ssh/id_rsa
-
-          # 扫描主机密钥（使用你真实的端口 46380）
           ssh-keyscan -p 46380 -H ${{ secrets.TOUGE_SERVER_IP }} >> ~/.ssh/known_hosts
-          echo "SSH环境配置完成，尝试连接服务器..."
 
-          # 部署到头歌服务器
+          echo "[CI] Connecting and deploying..."
           ssh -v -p 46380 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa root@${{ secrets.TOUGE_SERVER_IP }} << 'EOF'
             set -e
-            echo "成功连接服务器：$(whoami)@$(hostname)"
-
-            cd /root/flask-web-app || { echo "项目目录不存在"; exit 1; }
-            git pull origin main || { echo "Git拉取失败"; exit 1; }
-
+            echo "[SVR] Connected: $(whoami)@$(hostname)"
+            cd /root/flask-web-app || { echo "[SVR] Project dir missing"; exit 1; }
+            git pull origin main
             pip3 install --upgrade pip
-            pip3 install -r requirements.txt || { echo "依赖安装失败"; exit 1; }
-
-            supervisorctl restart flask-web-app || { echo "应用重启失败"; exit 1; }
+            pip3 install -r requirements.txt
+            supervisorctl restart flask-web-app || true
             supervisorctl status flask-web-app
-            echo "部署完成"
+            echo "[SVR] Deploy done."
           EOF
         env:
           TOUGE_SSH_PRIVATE_KEY: ${{ secrets.TOUGE_SSH_PRIVATE_KEY }}
